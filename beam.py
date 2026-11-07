@@ -96,18 +96,22 @@ class CircularBeam(Beam):
         self.A = pi * r**2 # m^2 (=1e6 mm^2), sectional area
         self.L = L # m (=1e-2 cm), length of beam
 
-def gen_sim_parameters(beam: Beam, nx=50, time=0.1, safety_factor=0.4, nframes=300):
+def gen_sim_parameters(beam: Beam, nx=50, time=1, safety_factor=0.4, samplerate=8000):
     """
     - nx: Number of spatial grid points.
     - safety_factor: CFL safety multiplier (< 0.5) to guarantee numerical stability.
-    - nframes: Target number of frames to save for rendering/animation.
+    - samplerate: Sampling rate (Hz) of the audio signal played back from the
+      saved frames.  dt is far smaller than one audio sample period, so only
+      every nskip-th step is stored; the stored frame rate then equals
+      samplerate, i.e. dt*nskip = 1/samplerate.
     """
     dx = beam.L / nx
     # CFL limit: dt <= 0.5 * dx^2 * sqrt((rou * A) / (E * I))
     cfl_dt = 0.5 * (dx**2) * np.sqrt((beam.rou * beam.A) / (beam.E * beam.I))
     dt = cfl_dt * safety_factor
     clockmax = max(1, int(np.ceil(time / dt)))
-    nskip = max(1, clockmax // nframes)
+    # nskip simulation steps per audio sample, so that 1 audio sample = nskip*dt
+    nskip = max(1, int(round(1.0 / (samplerate * dt))))
 
     return dt, clockmax, dx, nskip
 
@@ -128,7 +132,7 @@ class BeamPlot:
                                       blit=True)
         plt.show()
 
-def soundsc(y, samplerate=44100):
+def soundsc(y, samplerate=8000):
     """
     Scales the input NumPy array so its peak absolute amplitude is 1.0 
     and plays it through sounddevice, mimicking MATLAB's soundsc function.
