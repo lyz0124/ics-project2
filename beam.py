@@ -11,9 +11,27 @@ RADIUS = 0.5e-3 # m, radius of section
 ROU_IRON = 7874 # kg/m^3, density
 LENGTH = 4e-2 # m (=1e-2 cm), length of beam
 
-def derivative_4th(y, dx):
-    d4y = np.zeros(len(y))
+def my_derivative_4th(y, dx):
+    """Fourth derivative for a cantilever beam.
+
+    Clamped at x = 0 (y = 0, dy/dx = 0) and free at x = L
+    (d2y/dx2 = 0, d3y/dx3 = 0).  Ghost nodes are used at both ends so the
+    boundary points are updated by the same physics as the interior instead
+    of being frozen.
+    """
+    d4y = np.zeros_like(y)
     d4y[2:-2] = (y[4:] - 4*y[3:-1] + 6*y[2:-2] - 4*y[1:-3] + y[:-4]) / (dx**4)
+
+    # Free end: mirror the two ghost nodes outside the beam so that both the
+    # bending moment and the shear force vanish at the last node.
+    y_n = 2*y[-1] - y[-2]          # ghost node at x = L + dx
+    y_n1 = 2*y_n - 2*y[-2] + y[-3] # ghost node at x = L + 2*dx
+    d4y[-2] = (y_n - 4*y[-1] + 6*y[-2] - 4*y[-3] + y[-4]) / (dx**4)
+    d4y[-1] = (y_n1 - 4*y_n + 6*y[-1] - 4*y[-2] + y[-3]) / (dx**4)
+
+    # Clamped end: y[0] = 0 and the even ghost node y[-1] = y[1] enforces
+    # dy/dx = 0.  Node 0 itself stays fixed, so d4y[0] keeps its zero value.
+    d4y[1] = (y[3] - 4*y[2] + 7*y[1] - 4*y[0]) / (dx**4)
     return d4y
 
 class Beam:
@@ -56,7 +74,7 @@ class Beam:
         for clock in range(self.clockmax):
             t = clock * self.dt
             constant = (self.E*self.I) / (self.rou*self.A)
-            self.U -= self.dt * constant * derivative_4th(self.H, self.dx)
+            self.U -= self.dt * constant * my_derivative_4th(self.H, self.dx)
             self.H += self.dt * self.U
             # self.H[-1] = 2 * self.H[-2] - self.H[-3]
             # self.H[-2] = 2 * self.H[-3] - self.H[-4]
