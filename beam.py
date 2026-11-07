@@ -54,8 +54,22 @@ class Beam:
         self.tsave = np.zeros(clockmax//nskip+1)
 
     def set_initial_state(self, F):
-        # F in Newtons
-        self.H = F/(6*self.E*self.I) * self.X**3
+        """Static deflection of the cantilever released at t = 0.
+
+        The beam is loaded by a point force F (Newtons) at the free end.
+        The analytic shape satisfies the boundary conditions of the problem:
+
+            x = 0 (fixed):  y(0) = 0,  dy/dx(0) = 0
+            x = L (free):   d2y/dx2(L) = 0  (no bending moment)
+
+            y(x) = F * x^2 * (3L - x) / (6*E*I)
+
+        The old F/(6*E*I) * x^3 is the shape for a pure end *moment*, so it
+        gave a non-zero curvature at the free end (i.e. a clamped-clamped
+        intuition rather than a cantilever).  The beam is released from rest,
+        so the initial velocity is zero everywhere.
+        """
+        self.H = F * self.X**2 * (3*self.L - self.X) / (6*self.E*self.I)
         self.U = np.zeros(self.nx)
 
     @property
