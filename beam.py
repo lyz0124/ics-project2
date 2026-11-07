@@ -72,18 +72,6 @@ class Beam:
         self.H = F * self.X**2 * (3*self.L - self.X) / (6*self.E*self.I)
         self.U = np.zeros(self.nx)
 
-    @property
-    def get_X(self):
-        return self.X
-
-    @property
-    def get_H(self):
-        return self.H
-
-    @property
-    def get_U(self):
-        return self.U
-
     def vibrate(self):
         for clock in range(self.clockmax):
             t = clock * self.dt
@@ -94,7 +82,7 @@ class Beam:
             # self.H[-2] = 2 * self.H[-3] - self.H[-4]
 
             # assert self.U[1] == 0 and self.U[-2] == 0
-            assert not np.isnan(self.get_U[2])
+            assert not np.isnan(self.U[2])
 
             if clock % self.nskip == 0:
                 self.tsave[clock // self.nskip] = t
@@ -140,6 +128,19 @@ class BeamPlot:
                                       blit=True)
         plt.show()
 
+def soundsc(y, samplerate=44100):
+    """
+    Scales the input NumPy array so its peak absolute amplitude is 1.0 
+    and plays it through sounddevice, mimicking MATLAB's soundsc function.
+    """
+    y = np.asarray(y, dtype=np.float32)
+    max_val = np.max(np.abs(y))
+    
+    if max_val > 0:
+        y = y / max_val
+        
+    sd.play(y, samplerate)    
+
 if __name__ == "__main__":
     b = CircularBeam(E_IRON, RADIUS, ROU_IRON, LENGTH)
     dt, clockmax, dx, nskip = gen_sim_parameters(b)
@@ -148,11 +149,8 @@ if __name__ == "__main__":
 
     b.vibrate()
 
-    # print(b.get_H)
-    # plt.plot(b.get_X, b.get_H)
-    # plt.axis("equal")
-    # plt.show()
-    np.savetxt("vibbeam.csv", b.Hsave, delimiter=",")
+    np.save("b_Xsave.npy", b.Hsave)
+    soundsc(np.reshape(b.Hsave[:, -2], -1))
 
     p = BeamPlot(b)
     p.animate()
