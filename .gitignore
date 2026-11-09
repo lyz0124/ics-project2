@@ -1,3 +1,6 @@
 src/
 .venv
 __pycache__
+
+*.npy
+!example.npy
