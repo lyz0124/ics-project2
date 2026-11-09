@@ -9,7 +9,7 @@ E_IRON = 21e10 # Pascal, young's modulus
 # circular section case 
 RADIUS = 0.5e-3 # m, radius of section
 ROU_IRON = 7874 # kg/m^3, density
-LENGTH = 4e-2 # m (=1e-2 cm), length of beam
+LENGTH0 = 4e-2 # m (=1e-2 cm), length of beam
 
 def my_derivative_4th(y, dx, d4y):
     """Fourth derivative for a cantilever beam.
@@ -92,6 +92,14 @@ class Beam:
                 self.tsave[clock // self.nskip] = t
                 self.Hsave[clock // self.nskip] = self.H
 
+    def playsound(self, plot=False):
+        sound = np.reshape(self.Hsave[:, -2], -1)
+        soundsc(sound)
+        if plot:
+            plt.plot(sound)
+            # plt.show()
+        return sound
+
 class CircularBeam(Beam):
     def __init__(self, E, r, rou, L):
         self.E = E # Pascal, young's modulus
@@ -148,7 +156,7 @@ def soundsc(y: np.array, samplerate=8000):
     sd.play(y, samplerate)    
 
 if __name__ == "__main__":
-    b = CircularBeam(E_IRON, RADIUS, ROU_IRON, LENGTH)
+    b = CircularBeam(E_IRON, RADIUS, ROU_IRON, LENGTH0)
     dt, clockmax, dx, nskip = gen_sim_parameters(b)
     b.set_simulation(dt, clockmax, dx, nskip)
     b.set_initial_state(3)
