@@ -3,6 +3,7 @@ import sounddevice as sd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from math import pi
+from tqdm import tqdm
 import time
 
 E_IRON = 21e10 # Pascal, young's modulus
@@ -53,6 +54,9 @@ class Beam:
         self.Hsave = np.zeros((clockmax//nskip+1, self.nx))
         self.tsave = np.zeros(clockmax//nskip+1)
 
+    def set_damping(self, gamma):
+        self.gamma = gamma
+
     def set_initial_state(self, F):
         """Static deflection of the cantilever released at t = 0.
 
@@ -73,14 +77,12 @@ class Beam:
         self.U = np.zeros(self.nx)
 
     def vibrate(self):
-        for clock in range(self.clockmax):
+        for clock in tqdm(range(self.clockmax), "Running simulation"):
             t = clock * self.dt
             constant = (self.E*self.I) / (self.rou*self.A)
-            self.U -= self.dt * constant * my_derivative_4th(self.H, self.dx)
+            self.U -= self.dt * constant * my_derivative_4th(self.H, self.dx) +\
+                      self.dt * self.gamma * self.U
             self.H += self.dt * self.U
-            # self.H[-1] = 2 * self.H[-2] - self.H[-3]
-            # self.H[-2] = 2 * self.H[-3] - self.H[-4]
-
             # assert self.U[1] == 0 and self.U[-2] == 0
             assert not np.isnan(self.U[2])
 
@@ -128,8 +130,8 @@ class BeamPlot:
 
     def animate(self):
         self.ani = animation.FuncAnimation(fig=self.fig, func=self.update, 
-                                      frames=self.beam.Hsave.shape[0], interval=30,
-                                      blit=True)
+                                           frames=self.beam.Hsave.shape[0], interval=30,
+                                           blit=True)
         plt.show()
 
 def soundsc(y, samplerate=8000):
@@ -150,11 +152,15 @@ if __name__ == "__main__":
     dt, clockmax, dx, nskip = gen_sim_parameters(b)
     b.set_simulation(dt, clockmax, dx, nskip)
     b.set_initial_state(3)
+    b.set_damping(3)
 
     b.vibrate()
 
-    np.save("b_Xsave.npy", b.Hsave)
-    soundsc(np.reshape(b.Hsave[:, -2], -1))
+    np.save("output/b_Hsave.npy", b.Hsave)
+    sound = np.reshape(b.Hsave[:, -2], -1)
+    soundsc(sound)
+    plt.plot(sound)
+    plt.show()
 
     p = BeamPlot(b)
     p.animate()
