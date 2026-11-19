@@ -83,8 +83,17 @@ class Beam:
         self.H = F * self.X**2 * (3*self.L - self.X) / (6*self.E*self.I)
         self.U = np.zeros(self.nx)
 
-    def vibrate(self):
-        for clock in tqdm(range(self.clockmax), "Running simulation"):
+    def vibrate(self, desc="Running simulation", position=None, progress=True):
+        """Time-step the beam.
+
+        `position` lets several beams simulated in parallel threads draw their
+        progress bars on separate lines instead of overwriting each other;
+        `progress=False` disables the bar entirely (useful in worker
+        processes, which cannot share a single terminal cleanly).
+        """
+        steps = tqdm(range(self.clockmax), desc, position=position,
+                     leave=position is None) if progress else range(self.clockmax)
+        for clock in steps:
             t = clock * self.dt
             constant = (self.E*self.I) / (self.rou*self.A)
             my_derivative_4th(self.H, self.dx, self.d4H)
