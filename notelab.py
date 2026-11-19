@@ -4,7 +4,7 @@ from math import pi, sqrt
 
 from beam import *
 
-BETA1L = 1.857104
+BETA1L = 1.875104  # first root of cos(bL)cosh(bL) = -1 (cantilever)
 FORCE = 3
 GAMMA = 8
 MIDC_FREQ = 256
@@ -14,13 +14,15 @@ def gen_beam_length(beam: Beam, freq):
     L = BETA1L * sqrt(sqrt(E*I/(rou*A)) / (2*pi*freq))
     return L
 
-def gen_circular_beam(freq):
+def gen_circular_beam(freq, *, time=1.5, samplerate=8000, force=FORCE,
+                      gamma=GAMMA, nx=50):
     beam = CircularBeam(E_IRON, RADIUS, ROU_IRON, LENGTH0)
     beam.L = gen_beam_length(beam, freq)
-    dt, clockmax, dx, nskip = gen_sim_parameters(beam, time=1.5)
+    dt, clockmax, dx, nskip = gen_sim_parameters(
+        beam, nx=nx, time=time, samplerate=samplerate)
     beam.set_simulation(dt, clockmax, dx, nskip)
-    beam.set_initial_state(FORCE)
-    beam.set_damping(GAMMA)
+    beam.set_initial_state(force)
+    beam.set_damping(gamma)
     return beam
 
 if __name__ == "__main__":

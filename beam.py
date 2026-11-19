@@ -45,9 +45,16 @@ class Beam:
         self.dt = dt
         self.clockmax = clockmax
         self.dx = dx
-        self.nx = int(self.L / dx)
+        # nx nodes span exactly [0, L], so the free end is really at x = L
+        self.nx = int(round(self.L / dx)) + 1
         self.X = np.arange(self.nx) * self.dx
         self.nskip = nskip
+        # Sample rate of the stored frames (one frame every nskip steps) and
+        # the simulated duration.  gen_sim_parameters() makes 1/(nskip*dt)
+        # exactly equal for every beam so several beams can be added into a
+        # single buffer without any resampling.
+        self.samplerate = 1.0 / (nskip * dt)
+        self.time = clockmax * dt
 
         self.Hsave = np.zeros((clockmax//nskip+1, self.nx))
         self.tsave = np.zeros(clockmax//nskip+1)
@@ -92,6 +99,14 @@ class Beam:
                 self.tsave[clock // self.nskip] = t
                 self.Hsave[clock // self.nskip] = self.H
 
+    def tip_signal(self) -> np.ndarray:
+        """Audio waveform recorded near the free end of the beam.
+
+        Returned as a copy, so the same beam can be mixed into many buffers
+        (or plucked several times) without touching the stored field.
+        """
+        return self.Hsave[:, -2].copy()
+
     def playsound(self, plot=False):
         sound = np.reshape(self.Hsave[:, -2], -1)
         soundsc(sound)
@@ -107,23 +122,28 @@ class CircularBeam(Beam):
         self.rou = rou # kg/m^3, density
         self.A = pi * r**2 # m^2 (=1e6 mm^2), sectional area
         self.L = L # m (=1e-2 cm), length of beam
+        self.damping = False
 
-def gen_sim_parameters(beam: Beam, nx=50, time=1, safety_factor=0.4, samplerate=8000):
+def gen_sim_parameters(beam: Beam, nx=50, time=1, safety_factor=0.8, samplerate=8000):
     """
-    - nx: Number of spatial grid points.
+    - nx: Number of spatial grid points, spanning x = 0 .. L (dx = L/(nx-1)).
     - safety_factor: CFL safety multiplier (< 0.5) to guarantee numerical stability.
     - samplerate: Sampling rate (Hz) of the audio signal played back from the
       saved frames.  dt is far smaller than one audio sample period, so only
       every nskip-th step is stored; the stored frame rate then equals
       samplerate, i.e. dt*nskip = 1/samplerate.
     """
-    dx = beam.L / nx
+    dx = beam.L / (nx - 1)
     # CFL limit: dt <= 0.5 * dx^2 * sqrt((rou * A) / (E * I))
     cfl_dt = 0.5 * (dx**2) * np.sqrt((beam.rou * beam.A) / (beam.E * beam.I))
-    dt = cfl_dt * safety_factor
+    dt_max = cfl_dt * safety_factor
+    # One audio sample must be an integer number of simulation steps, otherwise
+    # the true playback rate 1/(nskip*dt) drifts away from `samplerate` and
+    # every beam ends up slightly out of tune with the others.  Rounding nskip
+    # *up* keeps dt = 1/(samplerate*nskip) <= dt_max, so the scheme stays stable.
+    nskip = max(1, int(np.ceil(1.0 / (samplerate * dt_max))))
+    dt = 1.0 / (samplerate * nskip)
     clockmax = max(1, int(np.ceil(time / dt)))
-    # nskip simulation steps per audio sample, so that 1 audio sample = nskip*dt
-    nskip = max(1, int(round(1.0 / (samplerate * dt))))
     print(f"Generated simulation: dt={dt}, clockmax={clockmax}, dx={dx}, nskip={nskip}")
 
     return dt, clockmax, dx, nskip
@@ -157,14 +177,14 @@ def soundsc(y: np.array, samplerate=8000):
 
 if __name__ == "__main__":
     b = CircularBeam(E_IRON, RADIUS, ROU_IRON, LENGTH0)
-    dt, clockmax, dx, nskip = gen_sim_parameters(b)
+    dt, clockmax, dx, nskip = gen_sim_parameters(b, safety_factor=0.9)
     b.set_simulation(dt, clockmax, dx, nskip)
     b.set_initial_state(3)
     b.set_damping(8)
 
     b.vibrate()
 
-    np.save("output/b_Hsave.npy", b.Hsave)
+    # np.save("output/b_Hsave.npy", b.Hsave)
     sound = np.reshape(b.Hsave[:, -2], -1)
     soundsc(sound)
     plt.plot(sound)
