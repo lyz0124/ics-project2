@@ -99,7 +99,10 @@ class Beam:
                 self.tsave[clock // self.nskip] = t
                 self.Hsave[clock // self.nskip] = self.H
 
-    def tip_signal(self) -> np.ndarray:
+        return self.sound
+
+    @property
+    def sound(self) -> np.ndarray:
         """Audio waveform recorded near the free end of the beam.
 
         Returned as a copy, so the same beam can be mixed into many buffers
